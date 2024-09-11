@@ -1,0 +1,112 @@
+use std::fs::File;
+use std::io::{self, Read, Write};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+// Функция для шифрования текста
+fn caesar_cipher(text: &str, shift: i32) -> String {
+    text.chars()
+        .map(|c| {
+            if c.is_ascii_alphabetic() {
+                let a = if c.is_ascii_lowercase() { 'a' } else { 'A' } as u8;
+                let shifted = (c as u8 - a + shift as u8) % 26 + a;
+                shifted as char
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
+// Функция для расшифровки текста
+fn caesar_decipher(text: &str, shift: i32) -> String {
+    caesar_cipher(text, -shift)
+}
+
+// Функция для генерации псевдослучайного сдвига
+fn random_shift() -> i32 {
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let nanos = since_the_epoch.subsec_nanos();
+    let shift = (nanos % 25 + 1) as i32; // Сдвиг от 1 до 25
+    shift
+}
+
+// Чтение текста из файла
+fn read_from_file(file_path: &str) -> Result<String, io::Error> {
+    let mut file = File::open(file_path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+
+// Чтение текста с клавиатуры
+fn read_from_input() -> String {
+    println!("Введите текст для шифрования:");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("Ошибка ввода");
+    input.trim().to_string()
+}
+
+// Запись зашифрованного текста в файл
+fn write_to_file(file_path: &str, text: &str) -> Result<(), io::Error> {
+    let mut file = File::create(file_path)?;
+    file.write_all(text.as_bytes())?;
+    Ok(())
+}
+
+fn main() {
+    let input_text = loop {
+        println!("Выберите источник текста:");
+        println!("1. Ввести текст вручную");
+        println!("2. Прочитать текст из файла");
+
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice).unwrap();
+        let choice = choice.trim();
+
+        match choice {
+            "1" => break read_from_input(),
+            "2" => {
+                println!("Введите путь к файлу:");
+                let mut file_path = String::new();
+                io::stdin().read_line(&mut file_path).unwrap();
+                let file_path = file_path.trim();
+                match read_from_file(file_path) {
+                    Ok(text) => break text,
+                    Err(e) => {
+                        eprintln!("Ошибка чтения файла: {}", e);
+                    }
+                }
+            }
+            _ => {
+                println!("Некорректный выбор. Пожалуйста, выберите 1 или 2.");
+            }
+        }
+    };
+
+    let shift = random_shift();
+    let encrypted_text = caesar_cipher(&input_text, shift);
+
+    println!("Зашифрованный текст: {}", encrypted_text);
+    println!("Использован сдвиг: {}", shift);
+
+    // Запрашиваем сохранение результата в файл
+    println!("Хотите сохранить зашифрованный текст в файл? (y/n):");
+    let mut save_choice = String::new();
+    io::stdin().read_line(&mut save_choice).unwrap();
+
+    if save_choice.trim().to_lowercase() == "y" {
+        println!("Введите путь для сохранения файла:");
+        let mut output_path = String::new();
+        io::stdin().read_line(&mut output_path).unwrap();
+        let output_path = output_path.trim();
+        if let Err(e) = write_to_file(output_path, &encrypted_text) {
+            eprintln!("Ошибка сохранения файла: {}", e);
+        } else {
+            println!("Зашифрованный текст сохранен в файл {}", output_path);
+        }
+    }
+
+    // Расшифровка текста
+    println!("Расшифрованный текст: {}", caesar_decipher(&encrypted_text, shift));
+}
